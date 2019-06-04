@@ -8,6 +8,7 @@ from torch.autograd import Variable
 from torchvision.models import vgg
 from torch.utils import data
 
+from utils.logger import *
 
 import os
 
@@ -19,9 +20,11 @@ def main():
     alpha = 0.6
     w = 0.4
 
+    logger = Logger("logs")
+
     print("Loading all detected objects in dataset...")
 
-    train_path = os.path.abspath(os.path.dirname(__file__)) + '/Kitti/training'
+    train_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), '../nusc_kitti/train')
     dataset = Dataset(train_path)
 
     params = {'batch_size': batch_size,
@@ -63,7 +66,7 @@ def main():
 
 
     total_num_batches = int(len(dataset) / batch_size)
-
+    batches_done = 0
     for epoch in range(first_epoch+1, epochs+1):
         curr_batch = 0
         passes = 0
@@ -89,6 +92,11 @@ def main():
             loss.backward()
             opt_SGD.step()
 
+            tensorboard_log = []
+            tensorboard_log += [("dim loss", dim_loss.item())]
+            tensorboard_log += [("orient loss", orient_loss.item())]
+            tensorboard_log += [("loss", loss.item())]
+            logger.list_of_scalars_summary(tensorboard_log, batches_done)
 
             if passes % 10 == 0:
                 print("--- epoch %s | batch %s/%s --- [loss: %s]" %(epoch, curr_batch, total_num_batches, loss.item()))
@@ -96,9 +104,11 @@ def main():
 
             passes += 1
             curr_batch += 1
+            batches_done += 1
+            print(batches_done)
 
-        # save after every 10 epochs
-        if epoch % 10 == 0:
+        # save after every 1 epoch
+        if epoch % 1 == 0:
             name = model_path + 'epoch_%s.pkl' % epoch
             print("====================")
             print ("Done with epoch %s!" % epoch)
