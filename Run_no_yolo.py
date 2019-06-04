@@ -46,10 +46,13 @@ def main():
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
 
-    dataset = Dataset(os.path.abspath(os.path.dirname(__file__)) + '/eval')
+    dataset = Dataset(os.path.abspath(os.path.dirname(__file__)) + '/../nusc_kitti/mini_val')
     averages = ClassAverages.ClassAverages()
-
     all_images = dataset.all_objects()
+    orient_score = 0
+    l2 = 0
+    tot = 0
+    os_tot = 0
     for key in sorted(all_images.keys()):
         data = all_images[key]
 
@@ -81,7 +84,17 @@ def main():
             alpha = np.arctan2(sin, cos)
             alpha += dataset.angle_bins[argmax]
             alpha -= np.pi
-
+            delta_theta = label['Alpha'] - alpha
+            tot += 1
+            if label['Class'] != 'traffic_cone':
+                orient_score += (1 + np.cos(delta_theta))/2
+                os_tot += 1
+            label_dim = label['Dimensions']
+            l2 += (dim[0]-label_dim[0])**2 + (dim[1]-label_dim[1])**2 + (dim[2]-label_dim[2])**2
+            print('Average Orientation Score', orient_score/os_tot)
+            print('L2 Loss', l2/tot)
+            print('Total Orientation Examples', os_tot)
+            print('Total Examples', tot)
             location = plot_regressed_3d_bbox(img, truth_img, cam_to_img, label['Box_2D'], dim, alpha, theta_ray)
 
             print('Estimated pose: %s'%location)
@@ -91,14 +104,16 @@ def main():
             # plot car by car
             if single_car:
                 numpy_vertical = np.concatenate((truth_img, img), axis=0)
-                cv2.imshow('2D detection on top, 3D prediction on bottom', numpy_vertical)
-                cv2.waitKey(0)
+                #cv2.imshow('2D detection on top, 3D prediction on bottom', numpy_vertical)
+                #cv2.waitKey(0)
+                cv2.imwrite(os.path.join('output', key + '_yolo.png'), numpy_vertical)
 
         # plot image by image
         if not single_car:
             numpy_vertical = np.concatenate((truth_img, img), axis=0)
-            cv2.imshow('2D detection on top, 3D prediction on bottom', numpy_vertical)
-            cv2.waitKey(0)
+            cv2.imwrite(os.path.join('output', key + '_yolo.png'), numpy_vertical)
+            #cv2.imshow('2D detection on top, 3D prediction on bottom', numpy_vertical)
+            #cv2.waitKey(0)
 
 if __name__ == '__main__':
     main()
