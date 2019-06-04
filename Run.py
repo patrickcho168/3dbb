@@ -25,6 +25,7 @@ from torch.autograd import Variable
 from torchvision.models import vgg
 
 import argparse
+from PIL import Image
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -110,7 +111,7 @@ def main():
     img_path = os.path.abspath(os.path.dirname(__file__)) + "/" + image_dir
     # using P_rect from global calibration file
     calib_path = os.path.abspath(os.path.dirname(__file__)) + "/" + cal_dir
-    calib_file = calib_path + "calib_cam_to_cam.txt"
+    # calib_file = calib_path + "calib_cam_to_cam.txt"
 
     # using P from each frame
     # calib_path = os.path.abspath(os.path.dirname(__file__)) + '/Kitti/testing/calib/'
@@ -128,13 +129,14 @@ def main():
         img_file = img_path + id + ".png"
 
         # P for each frame
-        # calib_file = calib_path + id + ".txt"
+        calib_file = calib_path + id + ".txt"
 
+        #comp_img = np.array(Image.open(img_file).convert('RGB'))
         truth_img = cv2.imread(img_file)
         img = np.copy(truth_img)
         yolo_img = np.copy(truth_img)
 
-        detections = yolo.detect(yolo_img)
+        detections = yolo.detect(img_file)
 
         for detection in detections:
 
@@ -143,10 +145,10 @@ def main():
 
             # this is throwing when the 2d bbox is invalid
             # TODO: better check
-            try:
-                object = DetectedObject(img, detection.detected_class, detection.box_2d, calib_file)
-            except:
-                continue
+            #try:
+            object = DetectedObject(img, detection.detected_class, detection.box_2d, calib_file)
+            #except:
+            #    continue
 
             theta_ray = object.theta_ray
             input_img = object.img
@@ -182,20 +184,22 @@ def main():
 
         if FLAGS.show_yolo:
             numpy_vertical = np.concatenate((truth_img, img), axis=0)
-            cv2.imshow('SPACE for next image, any other key to exit', numpy_vertical)
+            cv2.imwrite(os.path.join('output', id + '_yolo.png'), numpy_vertical)
+            #cv2.imshow('SPACE for next image, any other key to exit', numpy_vertical)
         else:
-            cv2.imshow('3D detections', img)
+            cv2.imwrite(os.path.join('output', id + '_3d.png'), img)
+            #cv2.imshow('3D detections', img)
 
         if not FLAGS.hide_debug:
             print("\n")
             print('Got %s poses in %.3f seconds'%(len(detections), time.time() - start_time))
             print('-------------')
 
-        if FLAGS.video:
-            cv2.waitKey(1)
-        else:
-            if cv2.waitKey(0) != 32: # space bar
-                exit()
+        #if FLAGS.video:
+        #    cv2.waitKey(1)
+        #else:
+        #    if cv2.waitKey(0) != 32: # space bar
+        #        exit()
 
 if __name__ == '__main__':
     main()
