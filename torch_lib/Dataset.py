@@ -30,7 +30,7 @@ class Dataset(data.Dataset):
         # use a relative path instead?
 
         # TODO: which camera cal to use, per frame or global one?
-        self.proj_matrix = get_P(os.path.abspath(os.path.dirname(os.path.dirname(__file__)) + '/camera_cal/calib_cam_to_cam.txt'))
+        # self.proj_matrix = get_P(os.path.abspath(os.path.dirname(os.path.dirname(__file__)) + '/camera_cal/calib_cam_to_cam.txt'))
 
         self.ids = [x.split('.')[0] for x in sorted(os.listdir(self.top_img_path))] # name of file
         self.num_images = len(self.ids)
@@ -52,7 +52,8 @@ class Dataset(data.Dataset):
                                 (i*self.interval + self.interval + overlap) % (2*np.pi)) )
 
         # hold average dimensions
-        class_list = ['Car', 'Van', 'Truck', 'Pedestrian','Person_sitting', 'Cyclist', 'Tram', 'Misc']
+        # class_list = ['Car', 'Van', 'Truck', 'Pedestrian','Person_sitting', 'Cyclist', 'Tram', 'Misc']
+        class_list = ['barrier', 'traffic_cone', 'bicycle', 'motorcycle', 'pedestrian', 'car', 'bus', 'construction_vehicle', 'trailer', 'truck']
         self.averages = ClassAverages(class_list)
 
         self.object_list = self.get_objects(self.ids)
@@ -86,7 +87,9 @@ class Dataset(data.Dataset):
 
         label = self.labels[id][str(line_num)]
         # P doesn't matter here
-        obj = DetectedObject(self.curr_img, label['Class'], label['Box_2D'], self.proj_matrix, label=label)
+        calib_path = self.top_calib_path + '%s.txt'%id
+        proj_matrix = get_calibration_cam_to_image(calib_path)
+        obj = DetectedObject(self.curr_img, label['Class'], label['Box_2D'], proj_matrix, label=label)
 
         return obj.img, label
 
@@ -217,7 +220,7 @@ class Dataset(data.Dataset):
     # will be deprc soon
     def all_objects(self):
         data = {}
-        for id in self.ids:
+        for idx, id in enumerate(self.ids):
             data[id] = {}
             img_path = self.top_img_path + '%s.png'%id
             img = cv2.imread(img_path)
@@ -228,7 +231,7 @@ class Dataset(data.Dataset):
             proj_matrix = get_calibration_cam_to_image(calib_path)
 
             # using P_rect from global calib file
-            proj_matrix = self.proj_matrix
+            # proj_matrix = self.proj_matrix
 
             data[id]['Calib'] = proj_matrix
 
@@ -241,6 +244,8 @@ class Dataset(data.Dataset):
                 objects.append(DetectedObject(img, detection_class, box_2d, proj_matrix, label=label))
 
             data[id]['Objects'] = objects
+            #if idx > 200:
+            #    break
 
         return data
 
@@ -254,9 +259,8 @@ class DetectedObject:
     def __init__(self, img, detection_class, box_2d, proj_matrix, label=None):
 
         if isinstance(proj_matrix, str): # filename
-            proj_matrix = get_P(proj_matrix)
-            # proj_matrix = get_calibration_cam_to_image(proj_matrix)
-
+            # proj_matrix = get_P(proj_matrix)
+            proj_matrix = get_calibration_cam_to_image(proj_matrix)
         self.proj_matrix = proj_matrix
         self.theta_ray = self.calc_theta_ray(img, box_2d, proj_matrix)
         self.img = self.format_img(img, box_2d)
@@ -294,7 +298,21 @@ class DetectedObject:
         # crop image
         pt1 = box_2d[0]
         pt2 = box_2d[1]
-        crop = img[pt1[1]:pt2[1]+1, pt1[0]:pt2[0]+1]
+        y_min = max(0, min(pt1[1], img.shape[0]))
+        y_max = max(0, min(pt2[1] + 1, img.shape[0]))
+        x_min = max(0, min(pt1[0], img.shape[1]))
+        x_max = max(0, min(pt2[0] + 1, img.shape[1]))
+        if y_min >= y_max:
+            if y_min < img.shape[0]:
+                y_max = y_min + 1
+            else:
+                y_min = y_max - 1
+        if x_min >= x_max:
+            if x_min < img.shape[1]:
+                x_max = x_min + 1
+            else:
+                x_min = x_max - 1
+        crop = img[y_min:y_max, x_min:x_max]
         crop = cv2.resize(src = crop, dsize=(224, 224), interpolation=cv2.INTER_CUBIC)
 
         # recolor, reformat
