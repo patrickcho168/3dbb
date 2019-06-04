@@ -105,7 +105,6 @@ def main():
             passes += 1
             curr_batch += 1
             batches_done += 1
-            print(batches_done)
 
         # save after every 1 epoch
         if epoch % 1 == 0:
